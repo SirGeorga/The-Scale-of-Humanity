@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scale of Humanity</title>
+    <style>
+        :root {
+            --primary: #ff4757; /* Цвет пилюль (людей) */
+            --bg: #ffffff;
+            --text-main: #2f3542;
+            --text-muted: #a4b0be;
+            --accent: #1e90ff; /* Цвет ориентиров */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; /* Скрываем скролл, всё внутри 3D сцены */
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none; /* Пропускаем клики сквозь UI контейнер */
+        }
+
+        .counter-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #counter {
+            font-size: 5vw;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.03em;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media (min-width: 1000px) {
+            #counter { font-size: 4rem; }
+        }
+
+        #subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        #reference-label {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slider-wrapper {
+            width: 100%;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            pointer-events: auto; /* Возвращаем клики для ползунка */
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #dfe4ea;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -9px;
+            box-shadow: 0 2px 6px rgba(255, 71, 87, 0.4);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #dfe4ea;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(255, 71, 87, 0.4);
+        }
+        
+        #lang-switcher {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .lang-btn {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .lang-btn.active {
+            color: var(--text-main);
+            background: rgba(0,0,0,0.05);
+        }
+
+        .lang-btn:hover:not(.active) {
+            color: var(--text-main);
+        }
+
+        .hint {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            z-index: 2;
+            text-align: center;
+        }
+
+        #labels-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        /* Добавляем стили для подписей к ориентирам */
+        .scene-label {
+            position: absolute;
+            background: rgba(0, 85, 255, 0.95);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            pointer-events: none; /* Пропускаем клики сквозь надписи */
+            transform: translate(-50%, -150%); /* Центрируем и приподнимаем над объектом */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0, 85, 255, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="lang-switcher">
+        <span class="lang-btn active" data-lang="en">EN</span>
+        <span class="lang-btn" data-lang="ru">RU</span>
+    </div>
+
+    <div class="hint">Use the slider below to change the scale</div>
+
+    <!-- Контейнер для плавающих 2D подписей -->
+    <div id="labels-container"></div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="counter-container">
+            <div id="counter">1</div>
+            <div id="subtitle">person</div>
+            <div id="reference-label">Comparison: Car</div>
+        </div>
+        <div class="slider-wrapper">
+            <input type="range" id="population-slider" min="0" max="1000" value="0" step="1">
+        </div>
+    </div>
+
+    <!-- Подключаем Three.js (обновленная версия для поддержки CapsuleGeometry) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+
+    <script>
+        // --- КОНСТАНТЫ И ДАННЫЕ ---
+        const MAX_POPULATION = 8000000000; // Население Земли (8 млрд)
+        const MAX_INSTANCES = 15000; // Макс. кол-во физически отрисовываемых пилюль (для FPS)
+        const PERSON_RADIUS = 0.25;
+        const PERSON_HEIGHT = 1.8;
+        const C_SPREAD = 0.45; // Коэффициент плотности толпы
+        
+        const PILL_COLOR = 0xff4757;
+        const REF_COLOR = 0x0044ff; // Сделали цвет более насыщенным синим
+
+        const translations = {
+            en: {
+                hint: "Use the slider below to change the scale",
+                comparison: "Comparison: "
+            },
+            ru: {
+                hint: "Используйте ползунок внизу, чтобы изменить масштаб",
+                comparison: "Сравнение: "
+            }
+        };
+        let currentLang = 'en';
+
+        // Объекты для сравнения (сохраняем оба варианта перевода)
+        const referenceObjects = [
+            { nameEn: "One person", nameRu: "Один человек", w: 0, h: 0, d: 0, threshold: 1 },
+            { nameEn: "Car", nameRu: "Легковая машина", w: 2, h: 1.5, d: 4, threshold: 12 },
+            { nameEn: "Passenger bus", nameRu: "Пассажирский автобус", w: 2.5, h: 3, d: 12, threshold: 60 },
+            { nameEn: "Two-story house", nameRu: "Частный двухэтажный дом", w: 12, h: 8, d: 10, threshold: 300 },
+            { nameEn: "Large apartment building", nameRu: "Большой многоквартирный дом", w: 25, h: 40, d: 20, threshold: 2500 },
+            { nameEn: "Football field", nameRu: "Футбольное поле", w: 68, h: 0.1, d: 105, threshold: 15000 },
+            { nameEn: "Eiffel Tower", nameRu: "Эйфелева башня", w: 125, h: 330, d: 125, threshold: 70000 },
+            { nameEn: "Gorky Park (Moscow)", nameRu: "Парк Горького (Москва)", w: 1000, h: 1, d: 2000, threshold: 800000 },
+            { nameEn: "Central Park (New York)", nameRu: "Центральный парк (Нью-Йорк)", w: 800, h: 1, d: 4000, threshold: 4000000 },
+            { nameEn: "Manhattan Island", nameRu: "Остров Манхэттен", w: 3500, h: 100, d: 21000, threshold: 30000000 },
+            { nameEn: "Moscow (within MKAD)", nameRu: "Москва (внутри МКАД)", w: 38000, h: 50, d: 38000, threshold: 250000000 },
+            { nameEn: "Cyprus Island", nameRu: "Остров Кипр", w: 225000, h: 1000, d: 90000, threshold: 4000000000 }
+        ];
+
+        // --- ИНИЦИАЛИЗАЦИЯ THREE.JS ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        // Изометрическая камера
+        const aspect = window.innerWidth / window.innerHeight;
+        let viewSize = 5; 
+        const camera = new THREE.OrthographicCamera(
+            -viewSize * aspect, viewSize * aspect,
+            viewSize, -viewSize,
+            1, 10000000 // Огромная дальность видимости
+        );
+        
+        // Позиционируем камеру для изометрии (сверху-вниз-сбоку)
+        const dist = 100000;
+        camera.position.set(dist, dist, dist);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true; // Включаем поддержку теней
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Делаем тени мягкими по краям
+        container.appendChild(renderer.domElement);
+
+        // Свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(0, 200, 0); // Источник света теперь прямо сверху
+        dirLight.castShadow = true; // Источник света отбрасывает тень
+        
+        // Настраиваем зону охвата тени (достаточно для макс. кол-ва физических пилюль)
+        const shadowSize = 80;
+        dirLight.shadow.camera.top = shadowSize;
+        dirLight.shadow.camera.bottom = -shadowSize;
+        dirLight.shadow.camera.left = -shadowSize;
+        dirLight.shadow.camera.right = shadowSize;
+        dirLight.shadow.camera.near = 0.1;
+        dirLight.shadow.camera.far = 500;
+        dirLight.shadow.mapSize.width = 2048; // Высокое разрешение тени
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.bias = -0.0005; // Убираем артефакты (shadow acne)
+        scene.add(dirLight);
+
+        // Создаем невидимый пол только для приема теней
+        const groundGeo = new THREE.PlaneGeometry(1000000, 1000000);
+        const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 }); // Прозрачность тени
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2; // Кладем плоскость горизонтально
+        ground.position.y = 0;
+        ground.receiveShadow = true; // Пол принимает тень
+        scene.add(ground);
+
+        // --- СОЗДАНИЕ ГРАФИКИ ---
+
+        // 1. Пилюли (Инстансы)
+        // Геометрия: Капсула (цилиндр со скругленными краями)
+        const pillGeo = new THREE.CapsuleGeometry(PERSON_RADIUS, PERSON_HEIGHT - PERSON_RADIUS * 2, 8, 16);
+        pillGeo.translate(0, PERSON_HEIGHT / 2, 0); // Поднимаем так, чтобы низ был на Y=0
+        
+        const pillMat = new THREE.MeshLambertMaterial({ color: PILL_COLOR }); 
+        const instancedMesh = new THREE.InstancedMesh(pillGeo, pillMat, MAX_INSTANCES);
+        instancedMesh.castShadow = true; // Пилюли отбрасывают тень
+        instancedMesh.receiveShadow = true; // Пилюли могут принимать тень друг от друга
+        scene.add(instancedMesh);
+
+        // Предрасчет позиций по спирали Фибоначчи для плотной "толпы"
+        const dummy = new THREE.Object3D();
+        const goldenRatio = (1 + Math.sqrt(5)) / 2;
+        const angleIncrement = Math.PI * 2 * goldenRatio;
+
+        // Массивы для хранения базовых позиций и фазы "парения"
+        const instanceX = new Float32Array(MAX_INSTANCES);
+        const instanceZ = new Float32Array(MAX_INSTANCES);
+        const instancePhase = new Float32Array(MAX_INSTANCES);
+
+        for (let i = 0; i < MAX_INSTANCES; i++) {
+            const r = C_SPREAD * Math.sqrt(i);
+            const theta = i * angleIncrement;
+            
+            instanceX[i] = r * Math.cos(theta);
+            instanceZ[i] = r * Math.sin(theta);
+            instancePhase[i] = Math.random() * Math.PI * 2; // У каждого своя фаза анимации
+            
+            dummy.position.set(instanceX[i], 0, instanceZ[i]);
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+        instancedMesh.count = 1; // Со старта показываем 1
+
+        // 2. Сплошная масса (Бесшовный переход при огромных числах)
+        // Идеально круглый цилиндр, который будет расти под пилюлями
+        const massGeo = new THREE.CylinderGeometry(1, 1, PERSON_HEIGHT, 64);
+        massGeo.translate(0, PERSON_HEIGHT / 2, 0);
+        const massMat = new THREE.MeshLambertMaterial({ 
+            color: PILL_COLOR, 
+            transparent: true, 
+            opacity: 0 
+        });
+        const massCylinder = new THREE.Mesh(massGeo, massMat);
+        massCylinder.castShadow = true; // Общая масса тоже отбрасывает тень
+        massCylinder.receiveShadow = true;
+        scene.add(massCylinder);
+
+        // 3. Объекты для сравнения (полупрозрачные кубы)
+        const refMeshes = [];
+        const labelsContainer = document.getElementById('labels-container'); // DOM контейнер для текстов
+
+        referenceObjects.forEach((ref, index) => {
+            if (index === 0) return; // Пропускаем "Один человек"
+            
+            const refGeo = new THREE.BoxGeometry(ref.w, ref.h, ref.d);
+            refGeo.translate(0, ref.h / 2, 0);
+            
+            // Внутренний полупрозрачный материал
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: REF_COLOR, 
+                transparent: true, 
+                opacity: 0,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(refGeo, mat);
+            
+            // Грани (Edge) для красоты
+            const edgesGeo = new THREE.EdgesGeometry(refGeo);
+            const edgesMat = new THREE.LineBasicMaterial({ 
+                color: REF_COLOR, 
+                transparent: true, 
+                opacity: 0 
+            });
+            const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+            
+            mesh.add(edges);
+            scene.add(mesh);
+
+            // Создаем HTML-подпись
+            const labelEl = document.createElement('div');
+            labelEl.className = 'scene-label';
+            labelEl.innerText = ref.nameEn;
+            labelsContainer.appendChild(labelEl);
+
+            // Точка, к которой будет привязан текст (центр верхней грани коробки)
+            const topCenter = new THREE.Vector3(0, ref.h, 0);
+            
+            refMeshes.push({ data: ref, mesh: mesh, edges: edges, labelEl: labelEl, topCenter: topCenter });
+        });
+
+        // --- ЛОГИКА И АНИМАЦИЯ ---
+        
+        const slider = document.getElementById('population-slider');
+        const counterEl = document.getElementById('counter');
+        const subtitleEl = document.getElementById('subtitle');
+        const refLabelEl = document.getElementById('reference-label');
+
+        let targetPopulationLog = 0; // Логарифм целевого числа
+        let currentPopulationLog = 0; // Логарифм текущего отображаемого
+        let currentViewSize = 5;
+
+        // Перевод из [0, 1000] в логарифм населения
+        function sliderToLog(val) {
+            return (val / 1000) * Math.log10(MAX_POPULATION);
+        }
+
+        slider.addEventListener('input', (e) => {
+            targetPopulationLog = sliderToLog(e.target.value);
+        });
+
+        // Логика переключателя языка
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const lang = e.target.getAttribute('data-lang');
+                if (lang !== currentLang) {
+                    currentLang = lang;
+                    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    // Обновляем статические тексты
+                    document.querySelector('.hint').innerText = translations[currentLang].hint;
+                    
+                    // Обновляем 3D-лейблы
+                    refMeshes.forEach(refObj => {
+                        refObj.labelEl.innerText = currentLang === 'en' ? refObj.data.nameEn : refObj.data.nameRu;
+                    });
+
+                    // Сбрасываем подпись сравнения для принудительного обновления в следующем кадре
+                    refLabelEl.innerText = "";
+                }
+            });
+        });
+
+        // Форматирование числа (запятые для EN, пробелы для RU)
+        function formatNumber(num) {
+            return Math.floor(num).toLocaleString(currentLang === 'en' ? 'en-US' : 'ru-RU');
+        }
+
+        // Выбор правильного склонения в зависимости от языка
+        function getSubtitle(num) {
+            const n = Math.floor(num);
+            if (currentLang === 'en') {
+                return n === 1 ? 'person' : 'people';
+            } else {
+                let n10 = n % 10;
+                let n100 = n % 100;
+                if (n100 > 10 && n100 < 20) return 'человек';
+                if (n10 > 1 && n10 < 5) return 'человека';
+                if (n10 == 1) return 'человек';
+                return 'человек';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Плавная интерполяция логарифма населения (для естественности)
+            currentPopulationLog += (targetPopulationLog - currentPopulationLog) * 0.05;
+            const displayN = Math.max(1, Math.pow(10, currentPopulationLog));
+
+            // Обновляем текст
+            counterEl.innerText = formatNumber(displayN);
+            subtitleEl.innerText = getSubtitle(displayN);
+
+            // Радиус текущей толпы
+            const crowdRadius = Math.max(C_SPREAD, C_SPREAD * Math.sqrt(displayN));
+
+            // 2. Обновление пилюль и массы
+            if (displayN <= MAX_INSTANCES) {
+                instancedMesh.count = Math.floor(displayN);
+                massMat.opacity = 0; // Прячем общую массу
+            } else {
+                instancedMesh.count = MAX_INSTANCES;
+                
+                // Плавное появление массы, чтобы скрыть границу инстансов
+                const fadeStart = MAX_INSTANCES;
+                const fadeEnd = MAX_INSTANCES * 1.5;
+                const opacity = (displayN - fadeStart) / (fadeEnd - fadeStart);
+                massMat.opacity = Math.min(1, Math.max(0, opacity));
+                
+                // Масштабируем цилиндр массы под реальный радиус
+                massCylinder.scale.set(crowdRadius, 1, crowdRadius);
+            }
+
+            // 3. Выбор и отображение объекта для сравнения
+            let activeRefIndex = -1;
+            let targetZoomRadius = crowdRadius * 2.5; // Базовый зум для охвата толпы
+            
+            for (let i = refMeshes.length - 1; i >= 0; i--) {
+                if (displayN >= refMeshes[i].data.threshold) {
+                    activeRefIndex = i;
+                    break;
+                }
+            }
+
+            // Вектор-помощник для перевода 3D координат в 2D экранные
+            const tempV = new THREE.Vector3();
+
+            // Анимация прозрачности параллелепипедов и движение подписей
+            refMeshes.forEach((refObj, index) => {
+                const isActive = (index === activeRefIndex);
+                // Плавно меняем прозрачность: активный - видим, остальные - исчезают
+                refObj.mesh.material.opacity += ((isActive ? 0.3 : 0) - refObj.mesh.material.opacity) * 0.1;
+                refObj.edges.material.opacity += ((isActive ? 1.0 : 0) - refObj.edges.material.opacity) * 0.1;
+
+                if (isActive) {
+                    // Переводим 3D точку (верх коробки) в 2D координаты на экране
+                    tempV.copy(refObj.topCenter);
+                    tempV.project(camera);
+                    const x = (tempV.x * .5 + .5) * window.innerWidth;
+                    const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                    // Двигаем HTML-элемент
+                    refObj.labelEl.style.left = `${x}px`;
+                    refObj.labelEl.style.top = `${y}px`;
+                    // Показываем подпись только когда коробка стала достаточно видимой
+                    refObj.labelEl.style.opacity = refObj.mesh.material.opacity > 0.1 ? 1 : 0;
+
+                    // Обновляем текст сравнения внизу экрана
+                    const currentRefName = currentLang === 'en' ? refObj.data.nameEn : refObj.data.nameRu;
+                    const compPrefix = translations[currentLang].comparison;
+
+                    if (refLabelEl.innerText !== compPrefix + currentRefName) {
+                        refLabelEl.style.opacity = 0;
+                        setTimeout(() => {
+                            refLabelEl.innerText = compPrefix + currentRefName;
+                            refLabelEl.style.opacity = 1;
+                        }, 150);
+                    }
+
+                    // Камера должна вмещать как толпу, так и сам объект сравнения
+                    const maxRefSize = Math.max(refObj.data.w, refObj.data.d) / 2;
+                    targetZoomRadius = Math.max(crowdRadius * 2.5, maxRefSize * 1.5);
+                } else {
+                    refObj.labelEl.style.opacity = 0;
+                }
+            });
+
+            // Если меньше первого порога - прячем надпись внизу
+            if (activeRefIndex === -1) {
+                refLabelEl.style.opacity = 0;
+            }
+
+            // Оптимизация: отключаем просчет теней, если на экране больше 300 пилюль
+            dirLight.castShadow = (displayN <= 300);
+
+            // --- АНИМАЦИЯ ПАРЕНИЯ ПИЛЮЛЬ (Левитация) ---
+            if (displayN <= MAX_INSTANCES) {
+                const time = Date.now() * 0.002; // Скорость парения
+                const visibleCount = Math.floor(displayN);
+                const baseHeight = 0.6; // Увеличили базовое возвышение (60см), чтобы тень не пропадала
+                
+                for (let i = 0; i < visibleCount; i++) {
+                    // Рассчитываем высоту Y с помощью синуса (амплитуда 15см) + базовый отступ
+                    const yOffset = baseHeight + Math.sin(time + instancePhase[i]) * 0.15;
+                    
+                    dummy.position.set(instanceX[i], yOffset, instanceZ[i]);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            // 4. Плавная работа камеры (Зум отдаления)
+            if (targetZoomRadius < 5) targetZoomRadius = 5; // Минимальный зум (на одного человека)
+            
+            currentViewSize += (targetZoomRadius - currentViewSize) * 0.05;
+
+            camera.left = -currentViewSize * aspect;
+            camera.right = currentViewSize * aspect;
+            camera.top = currentViewSize;
+            camera.bottom = -currentViewSize;
+            camera.updateProjectionMatrix();
+
+            renderer.render(scene, camera);
+        }
+
+        // Обработка ресайза окна
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.left = -currentViewSize * aspect;
+            camera.right = currentViewSize * aspect;
+            camera.top = currentViewSize;
+            camera.bottom = -currentViewSize;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Запуск
+        animate();
+    </script>
+</body>
+</html>
